@@ -391,6 +391,7 @@ class TabularPredictor:
         calibrate_decision_threshold=False,
         num_cpus="auto",
         num_gpus="auto",
+        trainer_callback=None,
         **kwargs,
     ):
         """
@@ -999,6 +1000,7 @@ class TabularPredictor:
             infer_limit_batch_size=infer_limit_batch_size,
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
+            trainer_callback=trainer_callback
         )
         self._set_post_fit_vars()
 
@@ -1010,6 +1012,7 @@ class TabularPredictor:
             calibrate=kwargs["calibrate"],
             calibrate_decision_threshold=calibrate_decision_threshold,
             infer_limit=infer_limit,
+            trainer_callback=trainer_callback
         )
         self.save()
         return self
@@ -1023,6 +1026,7 @@ class TabularPredictor:
         calibrate=False,
         calibrate_decision_threshold=False,
         infer_limit=None,
+        trainer_callback=None
     ):
         if refit_full is True:
             if keep_only_best is True:
@@ -1046,9 +1050,9 @@ class TabularPredictor:
             else:
                 _set_best_to_refit_full = False
             if refit_full == "best":
-                self.refit_full(model=trainer_model_best, set_best_to_refit_full=_set_best_to_refit_full)
+                self.refit_full(model=trainer_model_best, set_best_to_refit_full=_set_best_to_refit_full, trainer_callback=trainer_callback)
             else:
-                self.refit_full(model=refit_full, set_best_to_refit_full=_set_best_to_refit_full)
+                self.refit_full(model=refit_full, set_best_to_refit_full=_set_best_to_refit_full, trainer_callback=trainer_callback)
 
         if calibrate == "auto":
             if self.problem_type in PROBLEM_TYPES_CLASSIFICATION and self.eval_metric.needs_proba:
@@ -1080,7 +1084,7 @@ class TabularPredictor:
             self.save_space()
 
     # TODO: Consider adding infer_limit to fit_extra
-    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, fit_weighted_ensemble=True, num_cpus="auto", num_gpus="auto", **kwargs):
+    def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, fit_weighted_ensemble=True, num_cpus="auto", num_gpus="auto", trainer_callback=None, **kwargs):
         """
         Fits additional models after the original :meth:`TabularPredictor.fit` call.
         The original train_data and tuning_data will be used to train the models.
@@ -1232,6 +1236,7 @@ class TabularPredictor:
             core_kwargs=core_kwargs,
             aux_kwargs=aux_kwargs,
             name_suffix=name_suffix,
+            trainer_callback=trainer_callback
         )
 
         if time_limit is not None:
@@ -1242,7 +1247,7 @@ class TabularPredictor:
                 time_limit_weighted = max(time_limit, 60)
             else:
                 time_limit_weighted = None
-            fit_models += self.fit_weighted_ensemble(time_limit=time_limit_weighted)
+            fit_models += self.fit_weighted_ensemble(time_limit=time_limit_weighted, trainer_callback=trainer_callback)
 
         self._post_fit(
             keep_only_best=kwargs["keep_only_best"],
@@ -1260,14 +1265,14 @@ class TabularPredictor:
 
         return ret
 
-    def _fit_weighted_ensemble_pseudo(self):
+    def _fit_weighted_ensemble_pseudo(self, trainer_callback=None):
         """
         Fits weighted ensemble on top models trained with pseudo labeling, then if new
         weighted ensemble model is best model then sets `model_best` in trainer to
         weighted ensemble model.
         """
         logger.log(15, "Fitting weighted ensemble using top models")
-        weighted_ensemble_model_name = self.fit_weighted_ensemble()[0]
+        weighted_ensemble_model_name = self.fit_weighted_ensemble(trainer_callback=trainer_callback)[0]
 
         # TODO: This is a hack! self.predict_prob does not update to use weighted ensemble
         # if it's the best model.
@@ -1289,6 +1294,7 @@ class TabularPredictor:
         use_ensemble: bool = False,
         fit_ensemble: bool = False,
         fit_ensemble_every_iter: bool = False,
+        trainer_callback=None,
         **kwargs,
     ):
         """
@@ -1379,10 +1385,10 @@ class TabularPredictor:
 
             pseudo_data = unlabeled_data.loc[y_pseudo_og.index]
             pseudo_data[self.label] = y_pseudo_og
-            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)), **kwargs)
+            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=(i + 1)), trainer_callback=trainer_callback, **kwargs)
 
             if fit_ensemble and fit_ensemble_every_iter:
-                self._fit_weighted_ensemble_pseudo()
+                self._fit_weighted_ensemble_pseudo(trainer_callback=trainer_callback)
 
             current_score = self.info()["best_model_score_val"]
             logger.log(
@@ -1399,7 +1405,7 @@ class TabularPredictor:
                 previous_score = current_score
 
         if fit_ensemble and not fit_ensemble_every_iter:
-            self._fit_weighted_ensemble_pseudo()
+            self._fit_weighted_ensemble_pseudo(trainer_callback=trainer_callback)
             if self.can_predict_proba:
                 y_pred_proba_og = self.predict_proba(unlabeled_data)
             else:
@@ -1418,6 +1424,7 @@ class TabularPredictor:
         use_ensemble: bool = False,
         fit_ensemble: bool = False,
         fit_ensemble_every_iter: bool = False,
+        trainer_callback=None,
         **kwargs,
     ):
         """
@@ -1498,11 +1505,11 @@ class TabularPredictor:
         fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
         if is_labeled:
             logger.log(20, "Fitting predictor using the provided pseudolabeled examples as extra training data...")
-            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter="")[:-1], **fit_extra_kwargs)
+            self.fit_extra(pseudo_data=pseudo_data, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter="")[:-1], trainer_callback=trainer_callback, **fit_extra_kwargs)
 
             if fit_ensemble:
                 logger.log(15, "Fitting weighted ensemble model using best models")
-                self.fit_weighted_ensemble()
+                self.fit_weighted_ensemble(trainer_callback=trainer_callback)
 
             if return_pred_prob:
                 y_pred_proba = self.predict_proba(pseudo_data) if self.can_predict_proba else self.predict(pseudo_data)
@@ -1522,6 +1529,7 @@ class TabularPredictor:
                 use_ensemble=use_ensemble,
                 fit_ensemble=fit_ensemble,
                 fit_ensemble_every_iter=fit_ensemble_every_iter,
+                trainer_callback=trainer_callback,
                 **fit_extra_kwargs,
             )
 
@@ -2556,7 +2564,7 @@ class TabularPredictor:
         self._assert_is_fit("unpersist_models")
         return self._learner.load_trainer().unpersist_models(model_names=models)
 
-    def refit_full(self, model="all", set_best_to_refit_full=True):
+    def refit_full(self, model="all", set_best_to_refit_full=True, trainer_callback=None):
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -2591,6 +2599,8 @@ class TabularPredictor:
             This means the model used when `predictor.predict(data)` is called will be the refit_full version instead of the original version of the model.
             Ignored if `model` is not the best model.
             If str, interprets as a model name and sets best model to the refit_full version of the model `set_best_to_refit_full`.
+        trainer_callback: Any, default = None
+            Callback function
 
         Returns
         -------
@@ -2608,7 +2618,7 @@ class TabularPredictor:
             "\tThis process is not bound by time_limit, but should take less time than the original `predictor.fit` call.\n"
             '\tTo learn more, refer to the `.refit_full` method docstring which explains how "_FULL" models differ from normal models.',
         )
-        refit_full_dict = self._learner.refit_ensemble_full(model=model)
+        refit_full_dict = self._learner.refit_ensemble_full(model=model, trainer_callback=trainer_callback)
 
         if set_best_to_refit_full:
             if isinstance(set_best_to_refit_full, str):
@@ -2729,7 +2739,7 @@ class TabularPredictor:
     # TODO: Move code logic to learner/trainer
     # TODO: Add fit() arg to perform this automatically at end of training
     # TODO: Consider adding cutoff arguments such as top-k models
-    def fit_weighted_ensemble(self, base_models: list = None, name_suffix="Best", expand_pareto_frontier=False, time_limit=None, refit_full=False):
+    def fit_weighted_ensemble(self, base_models: list = None, name_suffix="Best", expand_pareto_frontier=False, time_limit=None, refit_full=False, trainer_callback=None):
         """
         Fits new weighted ensemble models to combine predictions of previously-trained models.
         `cache_data` must have been set to `True` during the original training to enable this functionality.
@@ -2754,6 +2764,8 @@ class TabularPredictor:
         refit_full : bool, default = False
             If True, will apply refit_full to all weighted ensembles created during this call.
             Identical to calling `predictor.refit_full(model=predictor.fit_weighted_ensemble(...))`
+        trainer_callback : Any, default = None
+            Callback function
 
         Returns
         -------
@@ -2797,6 +2809,7 @@ class TabularPredictor:
                     base_model_names=models_to_check_now,
                     name_suffix=name_suffix + "_Pareto" + str(i),
                     time_limit=time_limit,
+                    trainer_callback=trainer_callback
                 )
 
         max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
@@ -2809,10 +2822,11 @@ class TabularPredictor:
             base_model_names=base_models,
             name_suffix=name_suffix,
             time_limit=time_limit,
+            trainer_callback=trainer_callback
         )
 
         if refit_full:
-            models += self.refit_full(model=models)
+            models += self.refit_full(model=models, trainer_callback=trainer_callback)
 
         return models
 

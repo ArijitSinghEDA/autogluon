@@ -56,6 +56,7 @@ class AutoTrainer(AbstractTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         groups=None,
+        trainer_callback=None,
         **kwargs,
     ):
         for key in kwargs:
@@ -125,6 +126,7 @@ class AutoTrainer(AbstractTrainer):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            trainer_callback=trainer_callback
         )
 
     def construct_model_templates_distillation(self, hyperparameters, **kwargs):

@@ -940,7 +940,7 @@ class TimeSeriesPredictor:
             print("****************** End of fit() summary ******************")
         return results
 
-    def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True) -> Dict[str, str]:
+    def refit_full(self, model: str = "all", set_best_to_refit_full: bool = True, trainer_callback=None) -> Dict[str, str]:
         """Retrain model on all of the data (training + validation).
 
         This method can only be used if no ``tuning_data`` was passed to :meth:`~autogluon.timeseries.TimeSeriesPredictor.fit`.
@@ -976,7 +976,7 @@ class TimeSeriesPredictor:
             "\tThis process is not bound by time_limit, but should take less time than the original `fit` call."
         )
         model_best = self.get_model_best()
-        refit_full_dict = self._learner.refit_full(model=model)
+        refit_full_dict = self._learner.refit_full(model=model, trainer_callback=trainer_callback)
 
         if set_best_to_refit_full:
             if model_best in refit_full_dict:

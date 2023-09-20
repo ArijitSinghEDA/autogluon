@@ -52,6 +52,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit=None,
         infer_limit_batch_size=None,
         verbosity=2,
+        trainer_callback=None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -165,6 +166,7 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
+            trainer_callback=trainer_callback,
             **trainer_fit_kwargs,
         )
         self.save_trainer(trainer=trainer)

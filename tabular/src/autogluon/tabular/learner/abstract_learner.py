@@ -152,11 +152,11 @@ class AbstractTabularLearner(AbstractLearner):
             return None
         return self.label_cleaner.cat_mappings_dependent_var[1]
 
-    def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
+    def fit(self, X: DataFrame, X_val: DataFrame = None, trainer_callback=None, **kwargs):
         if self.is_fit:
             raise AssertionError("Learner is already fit.")
         self._validate_fit_input(X=X, X_val=X_val, **kwargs)
-        return self._fit(X=X, X_val=X_val, **kwargs)
+        return self._fit(X=X, X_val=X_val, trainer_callback=trainer_callback, **kwargs)
 
     def _fit(
         self,
@@ -168,7 +168,9 @@ class AbstractTabularLearner(AbstractLearner):
         holdout_frac=0.1,
         hyperparameters=None,
         verbosity=2,
+        trainer_callback=None,
     ):
+        print("Inside tabular fit")
         raise NotImplementedError
 
     def predict_proba(
@@ -444,8 +446,8 @@ class AbstractTabularLearner(AbstractLearner):
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model="all"):
-        return self.load_trainer().refit_ensemble_full(model=model)
+    def refit_ensemble_full(self, model="all", trainer_callback=None):
+        return self.load_trainer().refit_ensemble_full(model=model, trainer_callback=trainer_callback)
 
     def fit_transform_features(self, X, y=None, **kwargs):
         if self.label in X:
@@ -930,6 +932,7 @@ class AbstractTabularLearner(AbstractLearner):
         augmentation_data=None,
         augment_method="spunge",
         augment_args={"size_factor": 5, "max_size": int(1e5)},
+        trainer_callback=None
     ):
         """See abstract_trainer.distill() for details."""
         if X is not None:
@@ -970,6 +973,7 @@ class AbstractTabularLearner(AbstractLearner):
             augmentation_data=augmentation_data,
             augment_method=augment_method,
             augment_args=augment_args,
+            trainer_callback=trainer_callback
         )
         self.save_trainer(trainer=trainer)
         return distilled_model_names
