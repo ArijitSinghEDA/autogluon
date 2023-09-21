@@ -1966,8 +1966,10 @@ class AbstractTrainer:
             else:
                 sign_str = ""
             if callback_fn is not None:
+                X_val = load_pkl.load(os.path.join(self.path_data, "X_val.pkl"))
+                y_val = load_pkl.load(os.path.join(self.path_data, "y_val.pkl"))
                 fi = self.get_feature_importance(model=model)
-                callback_fn(model, fi[["importance"]])
+                callback_fn(model, fi[["importance"]], X_val, y_val, self.problem_type)
             logger.log(20, f"\t{round(model.val_score, 4)}\t = Validation score   ({sign_str}{model.eval_metric.name})")
         if model.fit_time is not None:
             logger.log(20, f"\t{round(model.fit_time, 2)}s\t = Training   runtime")
