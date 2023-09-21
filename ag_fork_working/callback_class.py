@@ -31,59 +31,65 @@ class AGCallBack:
                 else:
                     y_proba[classes[0]] = 1 - y_proba[classes[1]]
             else:
-                y_proba = pd.DataFrame(model.predict_proba(X_val), columns=y_val.unique().tolist())
+                y_proba = pd.DataFrame(model.predict_proba(X_val), columns=sorted(y_val.unique().tolist()))
             for col in y_pred.unique().tolist():
-                temp = pd.DataFrame({f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist()})
-                temp_pred = pd.DataFrame({"Predicted": y_pred.apply(lambda x: 1 if x == col else 0).values.tolist()})
-                self.y_preds[col] = pd.concat([temp, temp_pred], axis=1)
+                # temp = pd.DataFrame({f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist()})
+                # temp_pred = pd.DataFrame({"Predicted": y_pred.apply(lambda x: 1 if x == col else 0).values.tolist()})
+                # self.y_preds[col] = pd.concat([temp, temp_pred], axis=1)
+                self.y_preds[col] = pd.DataFrame(
+                    {
+                        f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist(),
+                        "Predicted": y_pred.apply(lambda x: 1 if x == col else 0).values.tolist()
+                    }
+                )
 
             for col in y_proba.columns.tolist():
-                temp = pd.DataFrame({f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist()})
-                temp_proba = pd.DataFrame({"Predicted_Probability": y_proba[col].values.tolist()})
-                self.y_probas[col] = pd.concat([temp, temp_proba], axis=1)
+                # temp = pd.DataFrame({f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist()})
+                # temp_proba = pd.DataFrame({"Predicted_Probability": y_proba[col].values.tolist()})
+                # self.y_probas[col] = pd.concat([temp, temp_proba], axis=1)
+                self.y_probas[col] = pd.DataFrame(
+                    {
+                        f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist(),
+                        "Predicted_Probability": y_proba[col].values.tolist()
+                    }
+                )
 
             self.obj = ClassifierGraphs(predicted_results=self.y_preds, probability_results=self.y_probas)
             self.obj.calculate_confusion_matrix_metrics()
             self.obj.calculate_cumulative_prediction_metrics()
 
-            # ROC-AUC
-            FPR, TPR = self.obj.roc_data_points()
-            plt.plot(FPR, TPR, marker='.')
-            plt.plot([0, 1], [0, 1], ls='--')
-            plt.title(f"{model.name}_ROC-AUC")
-            plt.xlabel("FPR")
-            plt.ylabel("TPR")
-            plt.show()
-
-            # PRC-AUC
-            Recall, Precision = self.obj.prc_data_points()
-            plt.plot(Recall, Precision, marker='.')
-            plt.plot([0, 1], [1, 0], ls='--')
-            plt.title(f"{model.name}_PRC-AUC")
-            plt.xlabel("Recall")
-            plt.ylabel("Precision")
-            plt.show()
-
-            # Gain
-            baseline, Gain = self.obj.gain_data_points()
-            # plt.plot(baseline, Gain, marker='.')
-            # plt.plot([baseline[0], baseline[-1]], [0, 1], ls='--')
-            # plt.title(f"{model.name}_Gain curve")
-            # plt.xlabel("Quantiles")
-            # plt.ylabel("Gain")
-            # plt.show()
-
-            # Lift
+            # # ROC-AUC
+            # FPR, TPR = self.obj.roc_data_points()
+            #
+            # # PRC-AUC
+            # Recall, Precision = self.obj.prc_data_points()
+            #
+            # # Gain
+            # baseline, Gain = self.obj.gain_data_points()
+            #
+            # # Lift
             # baseline, Lift = self.obj.lift_data_points()
-            # plt.plot(baseline, Lift, marker='.')
-            # plt.plot([baseline[0], baseline[-1]], [0, 0], ls='--')
-            # plt.title(f"{model.name}_Lift curve")
-            # plt.xlabel("Quantiles")
-            # plt.ylabel("Lift")
-            # plt.show()
         else:
-            pass
-        with open("risk_model_graph_information.txt", mode="a") as file:
+            baseline = list(range(len(y_val)))
+            Actual = y_val.values.tolist()
+            Predicted = y_pred.values.tolist()
+            Residual = (y_val.values - y_pred.values).tolist()
+
+            # Actual vs Predicted
+            plt.plot(baseline, Actual)
+            plt.plot(baseline, Predicted)
+            plt.title("Actual vs Predicted")
+            plt.ylabel("Actual/Predicted Graph")
+            plt.show()
+
+            plt.scatter(Predicted, Residual, marker='.')
+            plt.plot([min(Predicted), max(Predicted)], [0, 0], lw=2)
+            plt.title("Residual Graph")
+            plt.xlabel("Predicted")
+            plt.ylabel("Residual")
+            plt.show()
+
+        with open("app_model_graph_information.txt", mode="a") as file:
             file.write("\n========================================")
             file.write(f"\nOrder             : {self.order}")
             file.write(f"\nModel             : {model.name}")
@@ -96,7 +102,8 @@ class AGCallBack:
                 file.write("\nPoints for Gain stored in Baseline and Gain")
                 file.write("\nPoints for Lift stored in Baseline and Lift")
             else:
-                pass
+                file.write("\nPoints for Actual vs. Predicted stored in Baseline and Predicted")
+                file.write("\nPoints for Residual stored in Predicted and Residual")
             file.write("\n========================================")
 
     def data_processing_callback(self):
