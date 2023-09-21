@@ -20,11 +20,18 @@ class AGCallBack:
         self.order += 1
         fi = fi["importance"].apply(lambda x: np.round(x / fi['importance'].max(), 6))
         fi = fi[fi >= 0.001]
-        y_val = pd.Series(y_val)
         y_pred = pd.Series(model.predict(X_val))
         if problem_type != "regression":
-            print(model.predict_proba(X_val))
-            y_proba = pd.DataFrame(model.predict_proba(X_val), columns=y_val.unique().tolist())
+            if problem_type == "binary":
+                classes = sorted(y_val.unique().tolist())
+                try:
+                    y_proba = pd.DataFrame({classes[1]: model.predict_proba(X_val)})
+                except:
+                    y_proba = pd.DataFrame(model.predict_proba(X_val), columns=y_val.unique().tolist())
+                else:
+                    y_proba[classes[0]] = 1 - y_proba[classes[1]]
+            else:
+                y_proba = pd.DataFrame(model.predict_proba(X_val), columns=y_val.unique().tolist())
             for col in y_pred.unique().tolist():
                 temp = pd.DataFrame({f"Actual_{col}": y_val.apply(lambda x: 1 if x == col else 0).values.tolist()})
                 temp_pred = pd.DataFrame({"Predicted": y_pred.apply(lambda x: 1 if x == col else 0).values.tolist()})
@@ -76,7 +83,7 @@ class AGCallBack:
             # plt.show()
         else:
             pass
-        with open("model_graph_information.txt", mode="a") as file:
+        with open("risk_model_graph_information.txt", mode="a") as file:
             file.write("\n========================================")
             file.write(f"\nOrder             : {self.order}")
             file.write(f"\nModel             : {model.name}")
