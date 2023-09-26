@@ -52,7 +52,7 @@ class DefaultLearner(AbstractTabularLearner):
         infer_limit=None,
         infer_limit_batch_size=None,
         verbosity=2,
-        trainer_callback=None,
+        callbacks=None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -65,6 +65,11 @@ class DefaultLearner(AbstractTabularLearner):
             total number of models trained during bagging = num_bag_folds * num_bag_sets
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
+        if callbacks is not None:
+            if isinstance(callbacks, tuple):
+                data_processing_callback, *cbs, final_model_callback = callbacks
+            else:
+                raise ValueError(f"Cannot extract callbacks from {type(callbacks)}")
         self._time_limit = time_limit
         if time_limit:
             logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit}s")
@@ -127,6 +132,8 @@ class DefaultLearner(AbstractTabularLearner):
         self._post_X_rows = len(X)
         time_preprocessing_end = time.time()
         self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
+        if data_processing_callback:
+            data_processing_callback()
         logger.log(20, f"Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ...")
         if time_limit:
             time_limit_trainer = time_limit - self._time_fit_preprocessing
@@ -166,13 +173,15 @@ class DefaultLearner(AbstractTabularLearner):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
-            trainer_callback=trainer_callback,
+            callbacks=tuple(cbs),
             **trainer_fit_kwargs,
         )
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self._time_fit_training = time_end - time_preprocessing_end
         self._time_fit_total = time_end - time_preprocessing_start
+        if final_model_callback:
+            final_model_callback()
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ... Best model: "{trainer.model_best}"')
 
     def _update_infer_limit(self, X: DataFrame, *, infer_limit_batch_size: int, infer_limit: float = None):

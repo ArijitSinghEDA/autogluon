@@ -44,7 +44,7 @@ class TabularDataset(pd.DataFrame):
     def _constructor_sliced(self):
         return pd.Series
 
-    def __init__(self, data, **kwargs):
+    def __init__(self, data, callback=None, **kwargs):
         if isinstance(data, str):
             file_path = data
             data = load_pd.load(file_path)
@@ -52,3 +52,5 @@ class TabularDataset(pd.DataFrame):
             file_path = None
         super().__init__(data, **kwargs)
         self.file_path = file_path
+        if callback is not None:
+            callback()

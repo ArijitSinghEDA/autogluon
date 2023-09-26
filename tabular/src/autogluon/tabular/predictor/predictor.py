@@ -391,7 +391,7 @@ class TabularPredictor:
         calibrate_decision_threshold=False,
         num_cpus="auto",
         num_gpus="auto",
-        trainer_callback=None,
+        callbacks=None,
         **kwargs,
     ):
         """
@@ -1000,10 +1000,11 @@ class TabularPredictor:
             infer_limit_batch_size=infer_limit_batch_size,
             verbosity=verbosity,
             use_bag_holdout=use_bag_holdout,
-            trainer_callback=trainer_callback
+            callbacks=callbacks
         )
         self._set_post_fit_vars()
 
+        trainer_callback = callbacks[-1]
         self._post_fit(
             keep_only_best=kwargs["keep_only_best"],
             refit_full=kwargs["refit_full"],

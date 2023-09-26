@@ -152,11 +152,11 @@ class AbstractTabularLearner(AbstractLearner):
             return None
         return self.label_cleaner.cat_mappings_dependent_var[1]
 
-    def fit(self, X: DataFrame, X_val: DataFrame = None, trainer_callback=None, **kwargs):
+    def fit(self, X: DataFrame, X_val: DataFrame = None, callbacks=None, **kwargs):
         if self.is_fit:
             raise AssertionError("Learner is already fit.")
         self._validate_fit_input(X=X, X_val=X_val, **kwargs)
-        return self._fit(X=X, X_val=X_val, trainer_callback=trainer_callback, **kwargs)
+        return self._fit(X=X, X_val=X_val, callbacks=callbacks, **kwargs)
 
     def _fit(
         self,
@@ -168,7 +168,7 @@ class AbstractTabularLearner(AbstractLearner):
         holdout_frac=0.1,
         hyperparameters=None,
         verbosity=2,
-        trainer_callback=None,
+        callbacks=None,
     ):
         print("Inside tabular fit")
         raise NotImplementedError
@@ -735,13 +735,16 @@ class AbstractTabularLearner(AbstractLearner):
                     "r2",
                     "pearsonr",
                     "median_absolute_error",
+                    "mean_absolute_percentage_error"
                 ]
             if self.problem_type in [BINARY, MULTICLASS]:  # Adding classification metrics
                 auxiliary_metrics_lst += [
                     "accuracy",
                     "balanced_accuracy",
-                    # 'log_loss',  # Don't include as it probably adds more confusion to novice users (can be infinite)
+                    'log_loss',  # Don't include as it probably adds more confusion to novice users (can be infinite)
                     "mcc",
+                    "pac_score",
+                    "roc_auc_ovo_macro"
                 ]
             if self.problem_type == BINARY:  # binary-specific metrics
                 auxiliary_metrics_lst += [
@@ -749,6 +752,17 @@ class AbstractTabularLearner(AbstractLearner):
                     "f1",
                     "precision",
                     "recall",
+                    "f1_macro",
+                    "f1_micro",
+                    "f1_weighted",
+                    "roc_auc_ovo_macro",
+                    "average_precision",
+                    "precision_macro",
+                    "precision_micro",
+                    "precision_weighted",
+                    "recall_macro",
+                    "recall_micro",
+                    "recall_weighted"
                 ]
 
         scoring_args = dict(

@@ -56,9 +56,14 @@ class AutoTrainer(AbstractTrainer):
         infer_limit_batch_size=None,
         use_bag_holdout=False,
         groups=None,
-        trainer_callback=None,
+        callbacks=None,
         **kwargs,
     ):
+        if callbacks is not None:
+            if isinstance(callbacks, tuple):
+                validation_split_callback, model_callback = callbacks
+            else:
+                raise ValueError(f"Cannot extract callbacks from {type(callbacks)}")
         for key in kwargs:
             logger.warning(f"Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}")
 
@@ -86,6 +91,8 @@ class AutoTrainer(AbstractTrainer):
                     random_state=self.random_state,
                     min_cls_count_train=min_cls_count_train,
                 )
+                if validation_split_callback:
+                    validation_split_callback()
                 logger.log(
                     20, f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}"
                 )
@@ -126,7 +133,7 @@ class AutoTrainer(AbstractTrainer):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
-            trainer_callback=trainer_callback
+            trainer_callback=model_callback
         )
 
     def construct_model_templates_distillation(self, hyperparameters, **kwargs):
