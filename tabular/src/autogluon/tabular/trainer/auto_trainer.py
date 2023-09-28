@@ -61,7 +61,7 @@ class AutoTrainer(AbstractTrainer):
     ):
         if callbacks is not None:
             if isinstance(callbacks, tuple):
-                validation_split_callback, model_callback = callbacks
+                validation_split_callback, *cbs = callbacks
             else:
                 raise ValueError(f"Cannot extract callbacks from {type(callbacks)}")
         for key in kwargs:
@@ -133,7 +133,7 @@ class AutoTrainer(AbstractTrainer):
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             groups=groups,
-            trainer_callback=model_callback
+            callbacks=tuple(cbs)
         )
 
     def construct_model_templates_distillation(self, hyperparameters, **kwargs):

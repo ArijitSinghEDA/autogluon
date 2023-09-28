@@ -321,7 +321,7 @@ class AbstractTrainer:
         level_time_modifier=0.333,
         infer_limit=None,
         infer_limit_batch_size=None,
-        trainer_callback=None
+        callbacks=None
     ) -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
@@ -395,7 +395,7 @@ class AbstractTrainer:
                 name_suffix=name_suffix,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
-                trainer_callback=trainer_callback
+                callbacks=callbacks
             )
             model_names_fit += base_model_names + aux_models
         if self.model_best is None and len(model_names_fit) != 0:
@@ -511,7 +511,7 @@ class AbstractTrainer:
         name_suffix: str = None,
         infer_limit=None,
         infer_limit_batch_size=None,
-        trainer_callback=None
+        callbacks=None
     ) -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
@@ -538,13 +538,13 @@ class AbstractTrainer:
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
             base_model_names=base_model_names,
-            trainer_callback=trainer_callback,
+            callbacks=callbacks,
             **core_kwargs,
         )
 
         if X_val is None:
             aux_models = self.stack_new_level_aux(
-                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, trainer_callback=trainer_callback, **aux_kwargs
+                X=X, y=y, base_model_names=core_models, level=level + 1, infer_limit=infer_limit, infer_limit_batch_size=infer_limit_batch_size, callbacks=callbacks, **aux_kwargs
             )
         else:
             aux_models = self.stack_new_level_aux(
@@ -555,7 +555,7 @@ class AbstractTrainer:
                 level=level + 1,
                 infer_limit=infer_limit,
                 infer_limit_batch_size=infer_limit_batch_size,
-                trainer_callback=trainer_callback,
+                callbacks=callbacks,
                 **aux_kwargs,
             )
         return core_models, aux_models
@@ -582,7 +582,7 @@ class AbstractTrainer:
         refit_full=False,
         infer_limit=None,
         infer_limit_batch_size=None,
-        trainer_callback=None,
+        callbacks=None,
         **kwargs,
     ) -> List[str]:
         """
@@ -605,6 +605,12 @@ class AbstractTrainer:
         ag_args_fit = ag_args_fit.copy()
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
+
+        if callbacks is not None:
+            if isinstance(callbacks, tuple):
+                num_models_callback, trainer_callback = callbacks
+            else:
+                raise ValueError(f"Cannot extract callbacks from {type(callbacks)}")
 
         if isinstance(models, dict):
             get_models_kwargs = dict(
@@ -648,6 +654,8 @@ class AbstractTrainer:
                     if "hyperparameter_tune_kwargs" in model_args_fit[model_name]
                 }
                 kwargs["hyperparameter_tune_kwargs"] = hyperparameter_tune_kwargs
+        if num_models_callback is not None:
+            num_models_callback(len(models))
         logger.log(20, f"Fitting {len(models)} L{level} models ...")
         X_init = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=True)
         if X_val is not None:
@@ -698,7 +706,7 @@ class AbstractTrainer:
         infer_limit_batch_size=None,
         use_val_cache=True,
         fit_weighted_ensemble=True,
-        trainer_callback=None
+        callbacks=None
     ) -> List[str]:
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
@@ -708,6 +716,11 @@ class AbstractTrainer:
         if fit_weighted_ensemble is False:
             # Skip fitting of aux models
             return []
+        if callbacks is not None:
+            if isinstance(callbacks, tuple):
+                _, trainer_callback = callbacks
+            else:
+                raise ValueError(f"Cannot extract callbacks from {type(callbacks)}")
         base_model_names = self._filter_base_models_via_infer_limit(base_model_names=base_model_names, infer_limit=infer_limit, infer_limit_modifier=0.95)
         if len(base_model_names) == 0:
             logger.log(20, f"No base models to train on, skipping auxiliary stack level {level}...")
@@ -1887,7 +1900,7 @@ class AbstractTrainer:
         extra_attributes = dict()
         if y_pred_proba_val is not None:
             # Cache y_pred_proba_val for later reuse to avoid redundant predict calls
-            self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
+            # self._save_model_y_pred_proba_val(model=model.name, y_pred_proba_val=y_pred_proba_val)
             extra_attributes["cached_y_pred_proba_val"] = True
 
         self.model_graph.add_node(
@@ -2422,7 +2435,7 @@ class AbstractTrainer:
         return model_names_trained
 
     def _train_multi_and_ensemble(
-        self, X, y, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, groups=None, trainer_callback=None, **kwargs
+        self, X, y, X_val, y_val, hyperparameters: dict = None, X_unlabeled=None, num_stack_levels=0, time_limit=None, groups=None, callbacks=None, **kwargs
     ) -> List[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
         if time_limit is not None and time_limit <= 0:
@@ -2451,7 +2464,7 @@ class AbstractTrainer:
             level_start=1,
             level_end=num_stack_levels + 1,
             time_limit=time_limit,
-            trainer_callback=trainer_callback,
+            callbacks=callbacks,
             **kwargs,
         )
         if len(self.get_model_names()) == 0:
